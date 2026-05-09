@@ -1,9 +1,132 @@
 cat > index.html << 'EOF'
 <!DOCTYPE html>
-<html>
-<body style="background:white; color:black;">
-<h1>Truth Shield is Working!</h1>
-<p>Hello World</p>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Truth Shield — Free Disinformation Detector</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #ffffff; color: #1a1a1a; min-height: 100vh; }
+    header { background: #1a1f2e; padding: 20px 24px; display: flex; align-items: center; gap: 12px; }
+    header h1 { font-size: 1.5rem; font-weight: 700; color: #fff; }
+    header span.sub { font-size: 0.85rem; color: #a0aec0; }
+    main { max-width: 780px; margin: 40px auto; padding: 0 20px; }
+    .hero { text-align: center; margin-bottom: 40px; }
+    .hero h2 { font-size: 2rem; font-weight: 800; color: #1a1f2e; margin-bottom: 12px; }
+    .hero p { color: #4a5568; font-size: 1.05rem; max-width: 500px; margin: 0 auto; line-height: 1.6; }
+    .card { background: #f7fafc; border: 1px solid #e2e8f0; border-radius: 16px; padding: 28px; margin-bottom: 24px; }
+    textarea { width: 100%; min-height: 160px; background: #fff; border: 1px solid #e2e8f0; border-radius: 10px; color: #1a1a1a; font-size: 1rem; padding: 14px; resize: vertical; outline: none; font-family: inherit; line-height: 1.6; }
+    textarea:focus { border-color: #3182ce; }
+    .btn { width: 100%; margin-top: 16px; padding: 14px; background: #3182ce; color: #fff; font-size: 1rem; font-weight: 700; border: none; border-radius: 10px; cursor: pointer; }
+    .btn:disabled { opacity: 0.5; cursor: not-allowed; }
+    #result { display: none; }
+    .risk-header { display: flex; align-items: center; gap: 14px; margin-bottom: 20px; }
+    .risk-emoji { font-size: 2.2rem; }
+    .risk-label { font-size: 1.4rem; font-weight: 800; color: #1a1f2e; }
+    .risk-score { font-size: 0.95rem; color: #718096; }
+    .score-bar-wrap { background: #e2e8f0; border-radius: 999px; height: 10px; margin-bottom: 24px; overflow: hidden; }
+    .score-bar { height: 100%; border-radius: 999px; }
+    .section-title { font-size: 0.8rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.08em; color: #718096; margin-bottom: 8px; }
+    .verdict { font-size: 1.05rem; color: #1a1a1a; margin-bottom: 20px; line-height: 1.6; }
+    .signals { list-style: none; margin-bottom: 20px; }
+    .signals li { background: #fff5f5; border-left: 3px solid #e53e3e; padding: 10px 14px; border-radius: 0 8px 8px 0; margin-bottom: 8px; font-size: 0.95rem; color: #1a1a1a; }
+    .signals li.safe { background: #f0fff4; border-left-color: #38a169; }
+    .explanation { color: #4a5568; line-height: 1.7; font-size: 0.98rem; margin-bottom: 20px; }
+    .recommendation { background: #f0fff4; border: 1px solid #c6f6d5; border-radius: 10px; padding: 14px 16px; font-size: 0.95rem; color: #276749; line-height: 1.6; }
+    #loading { display: none; text-align: center; padding: 30px; }
+    .spinner { width: 40px; height: 40px; border: 3px solid #e2e8f0; border-top-color: #3182ce; border-radius: 50%; animation: spin 0.8s linear infinite; margin: 0 auto 16px; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    #error { display: none; background: #fff5f5; border: 1px solid #e53e3e; border-radius: 10px; padding: 14px; color: #c53030; margin-top: 16px; }
+    footer { text-align: center; padding: 40px 20px; color: #a0aec0; font-size: 0.85rem; }
+    footer a { color: #3182ce; text-decoration: none; }
+  </style>
+</head>
+<body>
+<header>
+  <span style="font-size:1.8rem">🛡️</span>
+  <div>
+    <h1>Truth Shield</h1>
+    <span class="sub">Free Disinformation Detector</span>
+  </div>
+</header>
+<main>
+  <div class="hero">
+    <h2>Is it real or fake?</h2>
+    <p>Paste any text, headline, or message and get an instant AI-powered disinformation analysis. Free. No account needed.</p>
+  </div>
+  <div class="card">
+    <textarea id="textInput" placeholder="Paste a news headline, social media post, WhatsApp message, or any text you want to fact-check..."></textarea>
+    <button class="btn" id="analyzeBtn" onclick="analyze()">🔍 Analyze for Disinformation</button>
+    <div id="error"></div>
+  </div>
+  <div id="loading"><div class="spinner"></div><p style="color:#718096">Analyzing...</p></div>
+  <div class="card" id="result">
+    <div class="risk-header">
+      <span class="risk-emoji" id="riskEmoji"></span>
+      <div>
+        <div class="risk-label" id="riskLabel"></div>
+        <div class="risk-score" id="riskScore"></div>
+      </div>
+    </div>
+    <div class="score-bar-wrap"><div class="score-bar" id="scoreBar"></div></div>
+    <div class="section-title">Verdict</div>
+    <div class="verdict" id="verdict"></div>
+    <div class="section-title">Signals Found</div>
+    <ul class="signals" id="signals"></ul>
+    <div class="section-title">Explanation</div>
+    <div class="explanation" id="explanation"></div>
+    <div class="section-title">What to do</div>
+    <div class="recommendation" id="recommendation"></div>
+  </div>
+</main>
+<footer>
+  <p>🛡️ Truth Shield — Built to protect vulnerable communities · <a href="https://github.com/Denofthives2026/truth-shield-web" target="_blank">Open Source on GitHub</a></p>
+</footer>
+<script>
+  async function analyze() {
+    const text = document.getElementById('textInput').value.trim();
+    const btn = document.getElementById('analyzeBtn');
+    const loading = document.getElementById('loading');
+    const result = document.getElementById('result');
+    const errorDiv = document.getElementById('error');
+    errorDiv.style.display = 'none';
+    result.style.display = 'none';
+    if (text.length < 20) { errorDiv.textContent = 'Please enter at least 20 characters.'; errorDiv.style.display = 'block'; return; }
+    btn.disabled = true;
+    loading.style.display = 'block';
+    try {
+      const response = await fetch('/api/analyze', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ text: text.slice(0, 3000) }) });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error || 'Analysis failed');
+      renderResult(data);
+    } catch (err) {
+      errorDiv.textContent = err.message || 'Something went wrong. Please try again.';
+      errorDiv.style.display = 'block';
+    } finally {
+      btn.disabled = false;
+      loading.style.display = 'none';
+    }
+  }
+  function renderResult(data) {
+    const { risk_score, risk_level, verdict, signals, explanation, recommendation } = data;
+    const config = { LOW: { emoji: '🟢', color: '#38a169' }, MEDIUM: { emoji: '🟡', color: '#d69e2e' }, HIGH: { emoji: '🟠', color: '#dd6b20' }, CRITICAL: { emoji: '🔴', color: '#e53e3e' } }[risk_level] || { emoji: '⚪', color: '#718096' };
+    document.getElementById('riskEmoji').textContent = config.emoji;
+    document.getElementById('riskLabel').textContent = 'Risk Level: ' + risk_level;
+    document.getElementById('riskScore').textContent = risk_score + '/100';
+    document.getElementById('scoreBar').style.width = risk_score + '%';
+    document.getElementById('scoreBar').style.background = config.color;
+    document.getElementById('verdict').textContent = verdict;
+    document.getElementById('explanation').textContent = explanation;
+    document.getElementById('recommendation').textContent = recommendation;
+    const signalsList = document.getElementById('signals');
+    signalsList.innerHTML = '';
+    if (signals.length === 0) { signalsList.innerHTML = '<li class="safe">✅ No major red flags detected</li>'; }
+    else { signals.forEach(s => { const li = document.createElement('li'); li.textContent = s; signalsList.appendChild(li); }); }
+    document.getElementById('result').style.display = 'block';
+    document.getElementById('result').scrollIntoView({ behavior: 'smooth' });
+  }
+</script>
 </body>
 </html>
 EOF
